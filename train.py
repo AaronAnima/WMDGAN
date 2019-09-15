@@ -14,7 +14,7 @@ import tensorflow_probability as tfp
 import ipdb
 
 
-G = get_G([None, flags.z_dim])
+G = get_G([None, 4, 4, 512])
 D = get_img_D([None, flags.img_size_h, flags.img_size_w, flags.c_dim])
 E = get_E([None, flags.img_size_h, flags.img_size_w, flags.c_dim])
 D_z = get_z_D([None, flags.z_dim])
@@ -72,6 +72,9 @@ def train_GE(con=False):
         '''
         if step == 0:
             eval_batch  = image_labels[0]
+            tl.visualize.save_images(eval_batch.numpy(), [8, 8],
+                                     '{}/eval_samples.png'.format(flags.sample_dir,
+                                                                       step // n_step_epoch, step))
         batch_imgs = image_labels[0]
 
         # ipdb.set_trace()
@@ -79,35 +82,40 @@ def train_GE(con=False):
         epoch_num = step // n_step_epoch
         with tf.GradientTape(persistent=True) as tape:
             z = np.random.normal(loc=0.0, scale=1, size=[flags.batch_size_train, flags.z_dim]).astype(np.float32)
-            tl.visualize.save_images(batch_imgs.numpy(), [8, 8],
-                                     '{}/raw_samples.png'.format(flags.sample_dir))
+            # tl.visualize.save_images(batch_imgs.numpy(), [8, 8],
+            #                          '{}/raw_samples.png'.format(flags.sample_dir))
+            # fake_z = E(batch_imgs)
+            # fake_imgs = G(fake_z)
+            # fake_logits = D(fake_imgs)
+            # real_logits = D(batch_imgs)
+            # fake_logits_z = D(G(z))
+            # real_z_logits = D_z(z)
+            # fake_z_logits = D_z(fake_z)
+            #
+            # e_loss_z = - tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.zeros_like(fake_z_logits)) + \
+            #            tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.ones_like(fake_z_logits))
+            #
+            # recon_loss = flags.lamba_recon * tl.cost.absolute_difference_error(batch_imgs, fake_imgs, is_mean=True)
+            # g_loss_x = - tl.cost.sigmoid_cross_entropy(fake_logits, tf.zeros_like(fake_logits)) + \
+            #            tl.cost.sigmoid_cross_entropy(fake_logits, tf.ones_like(fake_logits))
+            # g_loss_z = - tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.zeros_like(fake_logits_z)) + \
+            #            tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.ones_like(fake_logits_z))
+            #
+            # e_loss = recon_loss + e_loss_z
+            # g_loss = recon_loss + g_loss_x + g_loss_z
+            #
+            # d_loss = tl.cost.sigmoid_cross_entropy(real_logits, tf.ones_like(real_logits)) + \
+            #          tl.cost.sigmoid_cross_entropy(fake_logits, tf.zeros_like(fake_logits)) + \
+            #          tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.zeros_like(fake_logits_z))
+            #
+            # dz_loss = tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.zeros_like(fake_z_logits)) + \
+            #           tl.cost.sigmoid_cross_entropy(real_z_logits, tf.ones_like(real_z_logits))
             fake_z = E(batch_imgs)
-            fake_imgs = G(fake_z)
-            fake_logits = D(fake_imgs)
-            real_logits = D(batch_imgs)
-            fake_logits_z = D(G(z))
-            real_z_logits = D_z(z)
-            fake_z_logits = D_z(fake_z)
-
-            e_loss_z = - tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.zeros_like(fake_z_logits)) + \
-                       tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.ones_like(fake_z_logits))
-
-            recon_loss = flags.lamba_recon * tl.cost.absolute_difference_error(batch_imgs, fake_imgs, is_mean=True)
-            g_loss_x = - tl.cost.sigmoid_cross_entropy(fake_logits, tf.zeros_like(fake_logits)) + \
-                       tl.cost.sigmoid_cross_entropy(fake_logits, tf.ones_like(fake_logits))
-            g_loss_z = - tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.zeros_like(fake_logits_z)) + \
-                       tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.ones_like(fake_logits_z))
-
-            e_loss = recon_loss + e_loss_z
-            g_loss = recon_loss + g_loss_x + g_loss_z
-
-            d_loss = tl.cost.sigmoid_cross_entropy(real_logits, tf.ones_like(real_logits)) + \
-                     tl.cost.sigmoid_cross_entropy(fake_logits, tf.zeros_like(fake_logits)) + \
-                     tl.cost.sigmoid_cross_entropy(fake_logits_z, tf.zeros_like(fake_logits_z))
-
-            dz_loss = tl.cost.sigmoid_cross_entropy(fake_z_logits, tf.zeros_like(fake_z_logits)) + \
-                      tl.cost.sigmoid_cross_entropy(real_z_logits, tf.ones_like(real_z_logits))
-
+            recon_x = G(fake_z)
+            recon_loss = tl.cost.absolute_difference_error(batch_imgs, recon_x, is_mean=True)
+            latent_loss = tl.cost.absolute_difference_error
+            e_loss = recon_loss
+            g_loss = recon_loss
         # Updating Encoder
         grad = tape.gradient(e_loss, E.trainable_weights)
         e_optimizer.apply_gradients(zip(grad, E.trainable_weights))
@@ -116,23 +124,21 @@ def train_GE(con=False):
         grad = tape.gradient(g_loss, G.trainable_weights)
         g_optimizer.apply_gradients(zip(grad, G.trainable_weights))
 
-        # Updating Discriminator
-        grad = tape.gradient(d_loss, D.trainable_weights)
-        d_optimizer.apply_gradients(zip(grad, D.trainable_weights))
-
-        # Updating D_z & D_h
-        grad = tape.gradient(dz_loss, D_z.trainable_weights)
-        dz_optimizer.apply_gradients(zip(grad, D_z.trainable_weights))
+        # # Updating Discriminator
+        # grad = tape.gradient(d_loss, D.trainable_weights)
+        # d_optimizer.apply_gradients(zip(grad, D.trainable_weights))
+        #
+        # # Updating D_z & D_h
+        # grad = tape.gradient(dz_loss, D_z.trainable_weights)
+        # dz_optimizer.apply_gradients(zip(grad, D_z.trainable_weights))
 
         # basic
         if np.mod(step, flags.show_freq) == 0 and step != 0:
-            print("Epoch: [{}/{}] [{}/{}] e_loss: {:.5f}, g_loss: {:.5f}, d_loss: {:.5f}, "
-                  "dz_loss: {:.5f}, recon: {:.5f}".format
-                  (epoch_num, n_epoch, step, n_step_epoch, e_loss, g_loss,
-                   d_loss, dz_loss, recon_loss))
+            print("Epoch: [{}/{}] [{}/{}] e_loss: {:.5f}, g_loss: {:.5f}".format
+                  (epoch_num, n_epoch, step, n_step_epoch, e_loss, g_loss))
             # Kstest
-            p_min, p_avg = KStest(z, fake_z)
-            print("kstest: min:{}, avg:{}", p_min, p_avg)
+            # p_min, p_avg = KStest(z, fake_z)
+            # print("kstest: min:{}, avg:{}", p_min, p_avg)
 
         if np.mod(step, n_step_epoch) == 0 and step != 0:
             G.save_weights('{}/G.npz'.format(flags.checkpoint_dir), format='npz')
@@ -144,11 +150,10 @@ def train_GE(con=False):
             z = np.random.normal(loc=0.0, scale=1, size=[flags.batch_size_train, flags.z_dim]).astype(np.float32)
             G.eval()
             recon_imgs = G(E(eval_batch))
-            result = G(z)
             G.train()
-            tl.visualize.save_images(result.numpy(), [8, 8],
-                                     '{}/sample_{:02d}_{:04d}.png'.format(flags.sample_dir,
-                                                                            step // n_step_epoch, step))
+            # tl.visualize.save_images(result.numpy(), [8, 8],
+            #                          '{}/sample_{:02d}_{:04d}.png'.format(flags.sample_dir,
+            #                                                                 step // n_step_epoch, step))
             tl.visualize.save_images(recon_imgs.numpy(), [8, 8],
                                      '{}/recon_{:02d}_{:04d}.png'.format(flags.sample_dir,
                                                                             step // n_step_epoch, step))

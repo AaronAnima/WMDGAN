@@ -6,7 +6,7 @@ class FLAGS(object):
         ''' For training'''
         self.epsilon = 0.001
         self.n_epoch = 100 # "Epoch to train [25]"
-        self.z_dim = 128 # "Dim of noise value]"
+        self.z_dim = 512 # "Dim of noise value]"
         self.c_dim = 3 # "Number of image channels. [3]")
         # Learning rate
         self.lr_G = 0.0001
@@ -24,7 +24,7 @@ class FLAGS(object):
         self.img_size_h = 64 # Img height
         self.img_size_w = 64  # Img width
         self.eval_step = 100 # Evaluation freq during training
-        self.lamba_recon = 25
+        self.lamba_recon = 10
         self.len_dataset = 60000
         self.step_num = 200000
         self.param_dir = 'beta_ver'

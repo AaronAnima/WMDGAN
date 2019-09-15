@@ -18,26 +18,25 @@ def get_G(shape_z, ngf=64):    # Dimension of gen filters in first conv layer. [
         cngf = cngf * 2
         tisize = tisize * 2
     ni = Input(shape_z)
-    nn = Reshape(shape=[-1, 1, 1, 128])(ni)
+
+
+    nn = Reshape(shape=[-1, 1, 1, flags.z_dim])(ni)
     nn = DeConv2d(cngf, (4, 4), (1, 1), W_init=w_init, b_init=None, padding='VALID')(nn)
     nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-    print(nn.shape)
 
+    # nn = ni
     csize, cndf = 4, cngf
     while csize < isize // 2:
         cngf = cngf // 2
         nn = DeConv2d(cngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
         nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
         csize = csize * 2
 
     for t in range(n_extra_layers):
         nn = DeConv2d(cngf, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
         nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
 
     nn = DeConv2d(3, (4, 4), (2, 2), act=tf.nn.tanh, W_init=w_init, b_init=None)(nn)
-    print(nn.shape)
 
     return tl.models.Model(inputs=ni, outputs=nn)
 
@@ -52,26 +51,27 @@ def get_E(shape):
     print(" for E")
     ni = Input(shape)
     nn = Conv2d(ngf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(ni)
-    print(nn.shape)
+    # print(nn.shape)
     isize = isize // 2
 
     for t in range(n_extra_layers):
         nn = Conv2d(ngf, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
         nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
+        # print(nn.shape)
 
     while isize > 4:
         ngf = ngf * 2
         nn = Conv2d(ngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
-        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
+        if isize != 8:
+            nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+        # print(nn.shape)
         isize = isize // 2
 
     nn = Conv2d(flags.z_dim, (4, 4), (1, 1), act=None, W_init=w_init, b_init=None, padding='VALID')(nn)
-    print(nn.shape)
-    nz = Reshape(shape=[-1, 128])(nn)
+    # print(nn.shape)
+    nn = Reshape(shape=[-1, flags.z_dim])(nn)
 
-    return tl.models.Model(inputs=ni, outputs=nz)
+    return tl.models.Model(inputs=ni, outputs=nn)
 
 
 def get_img_D(shape):
@@ -100,11 +100,14 @@ def get_img_D(shape):
 
 def get_z_D(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
+    gamma_init = tf.random_normal_initializer(1., 0.02)
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
     n = Dense(n_units=750, act=lrelu, W_init=w_init)(nz)
-    n = Dense(n_units=750, act=lrelu, W_init=w_init)(n)
-    n = Dense(n_units=750, act=lrelu, W_init=w_init)(n)
+    n = Dense(n_units=750, act=None, W_init=w_init, b_init=None)(n)
+    n = BatchNorm(decay=0.9, act=lrelu, gamma_init=gamma_init, name=None)(n)
+    n = Dense(n_units=750, act=None, W_init=w_init, b_init=None)(n)
+    n = BatchNorm(decay=0.9, act=lrelu, gamma_init=gamma_init, name=None)(n)
     n = Dense(n_units=1, act=None, W_init=w_init, b_init=None)(n)
     return tl.models.Model(inputs=nz, outputs=n)
 
