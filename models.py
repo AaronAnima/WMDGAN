@@ -3,14 +3,15 @@ import tensorlayer as tl
 import numpy as np
 from tensorlayer.layers import Input, Dense, DeConv2d, Reshape, BatchNorm2d, Conv2d, Flatten, BatchNorm, Concat, GaussianNoise
 from config import flags
-from utils import WeightNorm
+from utils import SpectralNormConv2d
 
 
 def get_G(shape_z, ngf=64):    # Dimension of gen filters in first conv layer. [64]
     # w_init = tf.glorot_normal_initializer()
+    print("for G")
     w_init = tf.random_normal_initializer(stddev=0.02)
     gamma_init = tf.random_normal_initializer(1., 0.02)
-    n_extra_layers = 0
+    n_extra_layers = flags.n_extra_layers
     isize = 64
     cngf, tisize = ngf // 2, 4
     while tisize != isize:
@@ -21,12 +22,13 @@ def get_G(shape_z, ngf=64):    # Dimension of gen filters in first conv layer. [
     nn = DeConv2d(cngf, (4, 4), (1, 1), W_init=w_init, b_init=None, padding='VALID')(nn)
     nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
     print(nn.shape)
+
     csize, cndf = 4, cngf
     while csize < isize // 2:
-        nn = DeConv2d(cngf // 2, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+        cngf = cngf // 2
+        nn = DeConv2d(cngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
         nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
         print(nn.shape)
-        cngf = cngf // 2
         csize = csize * 2
 
     for t in range(n_extra_layers):
@@ -44,50 +46,56 @@ def get_G(shape_z, ngf=64):    # Dimension of gen filters in first conv layer. [
 def get_E(shape):
     w_init = tf.random_normal_initializer(stddev=0.02)
     gamma_init = tf.random_normal_initializer(1., 0.02)
-    lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     ngf = 64
-
+    isize = 64
+    n_extra_layers = flags.n_extra_layers
+    print(" for E")
     ni = Input(shape)
     nn = Conv2d(ngf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(ni)
-    nn = BatchNorm2d(decay=0.9, act=lrelu, gamma_init=gamma_init)(nn)
+    print(nn.shape)
+    isize = isize // 2
 
-    for i in range(3):
+    for t in range(n_extra_layers):
+        nn = Conv2d(ngf, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
+        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+        print(nn.shape)
+
+    while isize > 4:
         ngf = ngf * 2
-        nn = Conv2d(ngf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(nn)
-        nn = BatchNorm2d(decay=0.9, act=lrelu, gamma_init=gamma_init)(nn)
+        nn = Conv2d(ngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+        print(nn.shape)
+        isize = isize // 2
 
     nn = Conv2d(flags.z_dim, (4, 4), (1, 1), act=None, W_init=w_init, b_init=None, padding='VALID')(nn)
+    print(nn.shape)
     nz = Reshape(shape=[-1, 128])(nn)
 
     return tl.models.Model(inputs=ni, outputs=nz)
 
+
 def get_img_D(shape):
     w_init = tf.random_normal_initializer(stddev=0.02)
-    gamma_init = tf.random_normal_initializer(1., 0.02)
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     ndf = 64
     isize = 64
-    n_extra_layers = 0
+    n_extra_layers = flags.n_extra_layers
 
     ni = Input(shape)
     n = Conv2d(ndf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(ni)
     csize, cndf = isize / 2, ndf
 
     for t in range(n_extra_layers):
-        n = Conv2d(cndf, (3, 3), (1, 1), act=None, W_init=w_init, b_init=None)(n)
-        n = BatchNorm2d(decay=0.9, act=lrelu, gamma_init=gamma_init)(n)
+        n = SpectralNormConv2d(cndf, (3, 3), (1, 1), act=lrelu, W_init=w_init, b_init=None)(n)
 
     while csize > 4:
-        out_feat = cndf * 2
-        n = Conv2d(out_feat, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(n)
-        n = BatchNorm2d(decay=0.9, act=lrelu, gamma_init=gamma_init)(n)
         cndf = cndf * 2
+        n = SpectralNormConv2d(cndf, (4, 4), (2, 2), act=lrelu, W_init=w_init, b_init=None)(n)
         csize = csize / 2
 
     n = Conv2d(1, (4, 4), (1, 1), act=None, W_init=w_init, b_init=None, padding='VALID')(n)
 
     return tl.models.Model(inputs=ni, outputs=n)
-
 
 
 def get_z_D(shape_z):

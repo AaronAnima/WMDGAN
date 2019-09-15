@@ -40,6 +40,7 @@ class FLAGS(object):
         self.test_dir = './test_results'
         self.disentangle_step_num = 10
         self.lr_C = 0.0001
+        self.n_extra_layers = 2
         '''for opt'''
         self.sample_cnt = 10
         self.step_z = 100
