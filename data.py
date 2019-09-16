@@ -48,10 +48,10 @@ import ipdb
 # 39 Wearing_Necktie：戴着领带
 # 40 Young：年轻人
 
-
+#
 def get_celebA_attr(Attr_type):
-    image_path = "/home/asus/data/celebA/celebA/"
-    CelebA_Attr_file = "/home/asus/data/celebA/list_attr_celeba.txt"
+    image_path = "/home/dgx/WMD/data/celebA/celebA"
+    CelebA_Attr_file = "/home/dgx/WMD/data/list_attr_celeba.txt"
     labels = []
     with open(CelebA_Attr_file, "r") as Attr_file:
         Attr_info = Attr_file.readlines()
@@ -76,11 +76,6 @@ def get_dataset_train():
     images = tl.files.load_celebA_dataset(path='../data/celebA')
     # images = images / 127.5 - 1
     labels = get_celebA_attr(21)
-
-    # print(images)
-    # print(type(images))
-    # print(len(images))
-    # print(len(labels))
 
     assert len(images) == len(labels)
 
