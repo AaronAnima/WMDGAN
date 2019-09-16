@@ -12,7 +12,8 @@ class FLAGS(object):
         self.lr_G = 0.0001
         self.lr_E = 0.0005
         self.lr_D = 0.0005
-        self.lr_Dz = 0.0005
+        self.lr_Dz = 0.0002
+        self.lr_Gz = 0.0002
         self.lr_F = 0.0005
         self.lr_Dh = 0.0005
         self.beta1 = 0.5 # "Momentum term of adam [0.5]")

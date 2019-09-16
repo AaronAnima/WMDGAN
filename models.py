@@ -4,8 +4,6 @@ import numpy as np
 from tensorlayer.layers import Input, Dense, DeConv2d, Reshape, BatchNorm2d, Conv2d, Flatten, BatchNorm, Concat, GaussianNoise
 from config import flags
 from utils import SpectralNormConv2d
-
-
 def get_G(shape_z):    # Dimension of gen filters in first conv layer. [64]
     # w_init = tf.glorot_normal_initializer()
     print("for G")
@@ -19,12 +17,6 @@ def get_G(shape_z):    # Dimension of gen filters in first conv layer. [64]
         cngf = cngf * 2
         tisize = tisize * 2
     ni = Input(shape_z)
-
-
-    # nn = Reshape(shape=[-1, 1, 1, flags.z_dim])(ni)
-    # nn = DeConv2d(cngf, (4, 4), (1, 1), W_init=w_init, b_init=None, padding='VALID')(nn)
-    # nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-
     nn = ni
     csize, cndf = 4, cngf
     while csize < isize // 2:
@@ -45,6 +37,9 @@ def get_G(shape_z):    # Dimension of gen filters in first conv layer. [64]
     return tl.models.Model(inputs=ni, outputs=nn)
 
 
+    # nn = Reshape(shape=[-1, 1, 1, flags.z_dim])(ni)
+    # nn = DeConv2d(cngf, (4, 4), (1, 1), W_init=w_init, b_init=None, padding='VALID')(nn)
+    # nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
 # E is reverse of G without activation in the output layer
 def get_E(shape):
     w_init = tf.random_normal_initializer(stddev=0.02)
@@ -65,7 +60,7 @@ def get_E(shape):
 
     while isize > 4:
         ngf = ngf * 2
-        nn = Conv2d(ngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+        nn = Conv2d(ngf, (4, 4), (2, 2), W_init=w_init, b_init=None, act=None)(nn)
         if isize != 8:
             nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
         print(nn.shape)
@@ -106,26 +101,37 @@ def get_z_D(shape_z):
     gamma_init = tf.random_normal_initializer(1., 0.02)
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
-    nn = Reshape(shape=[-1, 4 * 4 * 512])(nz)
-    n = Dense(n_units= 4 * 512, act=lrelu, W_init=w_init)(nn)
-    n = Dense(n_units=512, act=lrelu, W_init=w_init, b_init=None)(n)
-    # n = BatchNorm(decay=0.9, act=lrelu, gamma_init=gamma_init, name=None)(n)
-    n = Dense(n_units=128, act=lrelu, W_init=w_init, b_init=None)(n)
-    # n = BatchNorm(decay=0.9, act=lrelu, gamma_init=gamma_init, name=None)(n)
-    n = Dense(n_units=1, act=None, W_init=w_init, b_init=None)(n)
+    n = Conv2d(512, (2, 2), (1, 1), act=lrelu, W_init=w_init)(nz)
+    n = SpectralNormConv2d(256, (2, 2), (1, 1), act=None, W_init=w_init, b_init=None)(n)
+    n = SpectralNormConv2d(256, (2, 2), (2, 2), act=None, W_init=w_init, b_init=None)(n)
+    n = SpectralNormConv2d(256, (2, 2), (1, 1), act=None, W_init=w_init, b_init=None)(n)
+    n = Reshape(shape=[-1, 2 * 2 * 256])(n)
+    n = Dense(n_units=1, act=tf.identity, W_init=w_init)(n)
     return tl.models.Model(inputs=nz, outputs=n)
+
 
 # 4 * 4 * 512 = 128 * 4 * 4 * 4 G is the transpose of D
 def get_z_G(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
     gamma_init = tf.random_normal_initializer(1., 0.02)
-    lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
+    # lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
-    n = Dense(n_units=4 * 128, act=lrelu, W_init=w_init)(nz)
-    n = Dense(n_units=4 * 4 * 128, act=None, W_init=w_init, b_init=None)(n)
-    n = BatchNorm(decay=0.9, act=lrelu, gamma_init=gamma_init, name=None)(n)
-    n = Dense(n_units=4 * 4 * 4 * 128, act=None, W_init=w_init, b_init=None)(n)
-    n = Reshape(shape=[-1, 4, 4, 512])(n)
+    n = Dense(n_units=2 * 2 * 256, W_init=w_init, b_init=None, act=None)(nz)
+    n = Reshape(shape=[-1, 2, 2, 256])(n)
+    # [None, 2, 2, 256]
+    n = DeConv2d(256, (2, 2), (1, 1), W_init=w_init)(n)
+    # n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    # [None, 2, 2, 256]
+    n = DeConv2d(256, (2, 2), (2, 2), W_init=w_init, b_init=None)(n)
+    n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    # [None, 4, 4, 256]
+    n = DeConv2d(512, (2, 2), (1, 1), W_init=w_init, b_init=None)(n)
+    n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    # [None, 4, 4, 512]
+    n = DeConv2d(512, (2, 2), (1, 1), W_init=w_init, act=None)(n)
+    # [None, 4, 4, 512]
+    # n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    # n = Reshape(shape=[-1, 4, 4, 512])(n)
     return tl.models.Model(inputs=nz, outputs=n)
 
 

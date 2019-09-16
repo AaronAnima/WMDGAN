@@ -110,11 +110,12 @@ def train_GE(con=False):
 def train_Gz():
     dataset, len_dataset = get_dataset_train()
     len_dataset = flags.len_dataset
-
+    G.load_weights('./checkpoint/G.npz')
+    E.load_weights('./checkpoint/E.npz')
     G.eval()
     E.eval()
     G_z.train()
-    D_z.trian()
+    D_z.train()
 
     n_step_epoch = int(len_dataset // flags.batch_size_train)
     n_epoch = int(flags.step_num // n_step_epoch)
@@ -122,8 +123,8 @@ def train_Gz():
     lr_Dz = flags.lr_Dz
     lr_Gz = flags.lr_Gz
 
-    dz_optimizer = tf.optimizers.Adam(lr_Dz, beta_1=flags.beta1, beta_2=flags.beta2)
-    gz_optimizer = tf.optimizers.Adam(lr_Gz, beta_1=flags.beta1, beta_2=flags.beta2)
+    dt_optimizer = tf.optimizers.Adam(lr_Dz, beta_1=flags.beta1, beta_2=flags.beta2)
+    gt_optimizer = tf.optimizers.Adam(lr_Gz, beta_1=flags.beta1, beta_2=flags.beta2)
     for step, image_labels in enumerate(dataset):
         '''
         log = " ** new learning rate: %f (for GAN)" % (lr_v.tolist()[0])
@@ -140,21 +141,21 @@ def train_Gz():
             fake_tensor_logits = D_z(fake_tensor)
             real_tensor_logits = D_z(real_tensor)
 
-            gz_loss = tl.cost.sigmoid_cross_entropy(fake_tensor_logits, tf.ones_like(fake_tensor_logits))
-            dz_loss = tl.cost.sigmoid_cross_entropy(real_tensor_logits, tf.ones_like(real_tensor_logits)) + \
+            gt_loss = tl.cost.sigmoid_cross_entropy(fake_tensor_logits, tf.ones_like(fake_tensor_logits))
+            dt_loss = tl.cost.sigmoid_cross_entropy(real_tensor_logits, tf.ones_like(real_tensor_logits)) + \
                       tl.cost.sigmoid_cross_entropy(fake_tensor_logits, tf.zeros_like(fake_tensor_logits))
         # Updating Generator
-        grad = tape.gradient(gz_loss, G_z.trainable_weights)
-        gz_optimizer.apply_gradients(zip(grad, G_z.trainable_weights))
+        grad = tape.gradient(gt_loss, G_z.trainable_weights)
+        gt_optimizer.apply_gradients(zip(grad, G_z.trainable_weights))
         #
         # Updating D_z & D_h
-        grad = tape.gradient(dz_loss, D_z.trainable_weights)
-        dz_optimizer.apply_gradients(zip(grad, D_z.trainable_weights))
+        grad = tape.gradient(dt_loss, D_z.trainable_weights)
+        dt_optimizer.apply_gradients(zip(grad, D_z.trainable_weights))
 
         # basic
         if np.mod(step, flags.show_freq) == 0 and step != 0:
-            print("Epoch: [{}/{}] [{}/{}] d_loss: {:.5f}, g_loss: {:.5f}".format
-                  (epoch_num, n_epoch, step, n_step_epoch, e_loss, g_loss))
+            print("Epoch: [{}/{}] [{}/{}] dt_loss: {:.5f}, gt_loss: {:.5f}".format
+                  (epoch_num, n_epoch, step, n_step_epoch, dt_loss, gt_loss))
 
         if np.mod(step, n_step_epoch) == 0 and step != 0:
             G_z.save_weights('{}/G_z.npz'.format(flags.checkpoint_dir), format='npz')
@@ -177,5 +178,5 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='DWGAN', help='train or eval')
     parser.add_argument('--is_continue', type=bool, default=False, help='load weights from checkpoints?')
     args = parser.parse_args()
-    train_GE(con=args.is_continue)
+    # train_GE(con=args.is_continue)
     train_Gz()
