@@ -12,7 +12,7 @@ class FLAGS(object):
         self.lr_G = 0.0001
         self.lr_E = 0.0005
         self.lr_D = 0.0005
-        self.lr_Dz = 0.0002
+        self.lr_Dz = 0.0005
         self.lr_Gz = 0.0002
         self.lr_F = 0.0005
         self.lr_Dh = 0.0005
@@ -25,7 +25,7 @@ class FLAGS(object):
         self.img_size_h = 64 # Img height
         self.img_size_w = 64  # Img width
         self.eval_step = 100 # Evaluation freq during training
-        self.lamba_recon = 10
+        self.lamba_recon = 25
         self.len_dataset = 60000
         self.step_num = 200000
         self.param_dir = 'beta_ver'
@@ -47,6 +47,8 @@ class FLAGS(object):
         self.step_z = 100
         self.opt_sample_dir = 'opt_img'
         self.acc_step = 100
+        self.margin = 0.01
+        self.noise_scale = 0.001
 
 
 

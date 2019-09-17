@@ -4,109 +4,74 @@ import numpy as np
 from tensorlayer.layers import Input, Dense, DeConv2d, Reshape, BatchNorm2d, Conv2d, Flatten, BatchNorm, Concat, GaussianNoise
 from config import flags
 from utils import SpectralNormConv2d
-def get_G(shape_z):    # Dimension of gen filters in first conv layer. [64]
-    # w_init = tf.glorot_normal_initializer()
-    print("for G")
-    ngf = 64
+
+
+def get_G(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
     gamma_init = tf.random_normal_initializer(1., 0.02)
-    n_extra_layers = flags.n_extra_layers
-    isize = 64
-    cngf, tisize = ngf // 2, 4
-    while tisize != isize:
-        cngf = cngf * 2
-        tisize = tisize * 2
     ni = Input(shape_z)
-    nn = ni
-    csize, cndf = 4, cngf
-    while csize < isize // 2:
-        cngf = cngf // 2
-        nn = DeConv2d(cngf, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
-        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
-        csize = csize * 2
+    # input size is [None, 8, 8, 128]
+    nn = DeConv2d(128, (1, 1), (1, 1), W_init=w_init, b_init=None, act=None)(ni)
 
-    for t in range(n_extra_layers):
-        nn = DeConv2d(cngf, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
-        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
+    nn = DeConv2d(64, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = DeConv2d(32, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = DeConv2d(32, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = DeConv2d(32, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
 
     nn = DeConv2d(3, (4, 4), (2, 2), act=tf.nn.tanh, W_init=w_init, b_init=None)(nn)
-    print(nn.shape)
 
     return tl.models.Model(inputs=ni, outputs=nn)
 
 
-    # nn = Reshape(shape=[-1, 1, 1, flags.z_dim])(ni)
-    # nn = DeConv2d(cngf, (4, 4), (1, 1), W_init=w_init, b_init=None, padding='VALID')(nn)
-    # nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
 # E is reverse of G without activation in the output layer
-def get_E(shape):
+def get_E(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
     gamma_init = tf.random_normal_initializer(1., 0.02)
-    ngf = 64
-    isize = 64
-    n_extra_layers = flags.n_extra_layers
-    print(" for E")
-    ni = Input(shape)
-    nn = Conv2d(ngf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(ni)
-    print(nn.shape)
-    isize = isize // 2
+    ni = Input(shape_z)
+    # output size is [None, 8, 8, 128]
 
-    for t in range(n_extra_layers):
-        nn = Conv2d(ngf, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
-        nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
+    nn = Conv2d(32, (3, 3), (1, 1), W_init=w_init, b_init=None)(ni)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
 
-    while isize > 4:
-        ngf = ngf * 2
-        nn = Conv2d(ngf, (4, 4), (2, 2), W_init=w_init, b_init=None, act=None)(nn)
-        if isize != 8:
-            nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
-        print(nn.shape)
-        isize = isize // 2
+    nn = Conv2d(32, (3, 3), (1, 1), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
 
-    # nn = Conv2d(flags.z_dim, (4, 4), (1, 1), act=None, W_init=w_init, b_init=None, padding='VALID')(nn)
-    # # print(nn.shape)
-    # nn = Reshape(shape=[-1, flags.z_dim])(nn)
+    nn = Conv2d(32, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = Conv2d(64, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = Conv2d(128, (4, 4), (2, 2), W_init=w_init, b_init=None)(nn)
+    nn = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(nn)
+
+    nn = Conv2d(128, (1, 1), (1, 1), W_init=w_init, b_init=None, act=None)(nn)
+
     return tl.models.Model(inputs=ni, outputs=nn)
-
-
-def get_img_D(shape):
-    w_init = tf.random_normal_initializer(stddev=0.02)
-    lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
-    ndf = 64
-    isize = 64
-    n_extra_layers = flags.n_extra_layers
-
-    ni = Input(shape)
-    n = Conv2d(ndf, (4, 4), (2, 2), act=None, W_init=w_init, b_init=None)(ni)
-    csize, cndf = isize / 2, ndf
-
-    for t in range(n_extra_layers):
-        n = SpectralNormConv2d(cndf, (3, 3), (1, 1), act=lrelu, W_init=w_init, b_init=None)(n)
-
-    while csize > 4:
-        cndf = cndf * 2
-        n = SpectralNormConv2d(cndf, (4, 4), (2, 2), act=lrelu, W_init=w_init, b_init=None)(n)
-        csize = csize / 2
-
-    n = Conv2d(1, (4, 4), (1, 1), act=None, W_init=w_init, b_init=None, padding='VALID')(n)
-
-    return tl.models.Model(inputs=ni, outputs=n)
 
 
 def get_z_D(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
-    gamma_init = tf.random_normal_initializer(1., 0.02)
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
-    n = Conv2d(512, (2, 2), (1, 1), act=lrelu, W_init=w_init)(nz)
-    n = SpectralNormConv2d(256, (2, 2), (1, 1), act=None, W_init=w_init, b_init=None)(n)
-    n = SpectralNormConv2d(256, (2, 2), (2, 2), act=None, W_init=w_init, b_init=None)(n)
-    n = SpectralNormConv2d(256, (2, 2), (1, 1), act=None, W_init=w_init, b_init=None)(n)
-    n = Reshape(shape=[-1, 2 * 2 * 256])(n)
-    n = Dense(n_units=1, act=tf.identity, W_init=w_init)(n)
+    # 8 8 128
+    n = SpectralNormConv2d(128, (3, 3), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(nz)
+    # 6 6 128
+    n = SpectralNormConv2d(128, (3, 3), (1, 1), act=lrelu, W_init=w_init)(n)
+    # 6 6 128
+    n = SpectralNormConv2d(256, (3, 3), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(n)
+    # 4 4 256
+    n = SpectralNormConv2d(512, (4, 4), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(n)
+    # 1 1 512
+    n = Reshape(shape=[-1, 512])(n)
+    n = Dense(n_units=1, act=tf.identity, W_init=w_init, b_init=None)(n)
     return tl.models.Model(inputs=nz, outputs=n)
 
 
@@ -116,22 +81,18 @@ def get_z_G(shape_z):
     gamma_init = tf.random_normal_initializer(1., 0.02)
     # lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
-    n = Dense(n_units=2 * 2 * 256, W_init=w_init, b_init=None, act=None)(nz)
-    n = Reshape(shape=[-1, 2, 2, 256])(n)
-    # [None, 2, 2, 256]
-    n = DeConv2d(256, (2, 2), (1, 1), W_init=w_init)(n)
-    # n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
-    # [None, 2, 2, 256]
-    n = DeConv2d(256, (2, 2), (2, 2), W_init=w_init, b_init=None)(n)
-    n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
-    # [None, 4, 4, 256]
-    n = DeConv2d(512, (2, 2), (1, 1), W_init=w_init, b_init=None)(n)
-    n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
-    # [None, 4, 4, 512]
-    n = DeConv2d(512, (2, 2), (1, 1), W_init=w_init, act=None)(n)
-    # [None, 4, 4, 512]
-    # n = BatchNorm(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
-    # n = Reshape(shape=[-1, 4, 4, 512])(n)
+    n = Dense(n_units=4 * 4 * 256, W_init=w_init, b_init=None, act=None)(nz)
+    n = Reshape(shape=[-1, 4, 4, 256])(n)
+    n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+
+    n = DeConv2d(128, (3, 3), (1, 1), W_init=w_init, padding='VALID', b_init=None)(n)
+    n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+
+    n = DeConv2d(128, (3, 3), (1, 1), W_init=w_init, b_init=None)(n)
+    n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+
+    n = Conv2d(128, (3, 3), (1, 1), W_init=w_init, padding='VALID')(n)
+
     return tl.models.Model(inputs=nz, outputs=n)
 
 

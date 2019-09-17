@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorlayer as tl
 from config import flags
 from data import get_dataset_train
-from models import get_G, get_E, get_z_D, get_img_D, get_z_G
+from models import get_G, get_E, get_z_D, get_z_G
 import random
 import argparse
 import math
@@ -19,9 +19,9 @@ import ipdb
 
 
 
-G = get_G([None, 4, 4, 512])
+G = get_G([None, 8, 8, 128])
 E = get_E([None, flags.img_size_h, flags.img_size_w, flags.c_dim])
-D_z = get_z_D([None, 4, 4, 512])
+D_z = get_z_D([None, 8, 8, 128])
 G_z = get_z_G([None, flags.z_dim])
 
 
@@ -71,10 +71,13 @@ def train_GE(con=False):
             tl.visualize.save_images(batch_imgs.numpy(), [8, 8],
                                      '{}/raw_samples.png'.format(flags.sample_dir))
             fake_z = E(batch_imgs)
-            recon_x = G(fake_z)
+            noise = np.random.normal(loc=0.0, scale=flags.noise_scale, size=fake_z.shape).astype(np.float32)
+            recon_x = G(fake_z + noise)
             recon_loss = tl.cost.absolute_difference_error(batch_imgs, recon_x, is_mean=True)
-            reg_loss = tf.math.maximum(tl.cost.mean_squared_error(fake_z, tf.zeros_like(fake_z)), 1)
-            # reg_loss = tl.cost.mean_squared_error(tl.cost.mean_squared_error(fake_z, tf.zeros_like(fake_z)), 1)
+            # reg_loss = tf.math.maximum(tl.cost.mean_squared_error(fake_z, tf.zeros_like(fake_z)), 0.5)
+            len = tl.cost.mean_squared_error(fake_z, tf.zeros_like(fake_z))
+            # print(len)
+            reg_loss = tf.math.maximum((len - 1) * (len - 1), flags.margin)
             e_loss = flags.lamba_recon * recon_loss + reg_loss
             g_loss = flags.lamba_recon * recon_loss
 
@@ -88,8 +91,8 @@ def train_GE(con=False):
 
         # basic
         if np.mod(step, flags.show_freq) == 0 and step != 0:
-            print("Epoch: [{}/{}] [{}/{}] e_loss: {:.5f}, g_loss: {:.5f}, recon_loss: {:.5f}, reg_loss: {:.5f}".format
-                  (epoch_num, n_epoch, step, n_step_epoch, e_loss, g_loss, recon_loss, reg_loss))
+            print("Epoch: [{}/{}] [{}/{}] e_loss: {:.5f}, g_loss: {:.5f}, recon_loss: {:.5f}, reg_loss: {:.5f}, len: {:.5f}"
+                  .format(epoch_num, n_epoch, step, n_step_epoch, e_loss, g_loss, recon_loss, reg_loss, len))
 
         if np.mod(step, n_step_epoch) == 0 and step != 0:
             G.save_weights('{}/G.npz'.format(flags.checkpoint_dir), format='npz')
@@ -178,5 +181,5 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='DWGAN', help='train or eval')
     parser.add_argument('--is_continue', type=bool, default=False, help='load weights from checkpoints?')
     args = parser.parse_args()
-    # train_GE(con=args.is_continue)
+    train_GE(con=args.is_continue)
     train_Gz()
