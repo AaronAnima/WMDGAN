@@ -61,17 +61,23 @@ def get_z_D(shape_z):
     w_init = tf.random_normal_initializer(stddev=0.02)
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
+    print(nz.shape)
     # 8 8 128
     n = SpectralNormConv2d(128, (3, 3), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(nz)
+    print(n.shape)
     # 6 6 128
     n = SpectralNormConv2d(128, (3, 3), (1, 1), act=lrelu, W_init=w_init)(n)
+    print(n.shape)
     # 6 6 128
     n = SpectralNormConv2d(256, (3, 3), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(n)
+    print(n.shape)
     # 4 4 256
     n = SpectralNormConv2d(512, (4, 4), (1, 1), act=lrelu, W_init=w_init, padding='VALID')(n)
+    print(n.shape)
     # 1 1 512
     n = Reshape(shape=[-1, 512])(n)
     n = Dense(n_units=1, act=tf.identity, W_init=w_init, b_init=None)(n)
+    print(n.shape)
     return tl.models.Model(inputs=nz, outputs=n)
 
 
@@ -81,18 +87,23 @@ def get_z_G(shape_z):
     gamma_init = tf.random_normal_initializer(1., 0.02)
     # lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     nz = Input(shape_z)
+    print(nz.shape)
     n = Dense(n_units=4 * 4 * 256, W_init=w_init, b_init=None, act=None)(nz)
+    print(n.shape)
     n = Reshape(shape=[-1, 4, 4, 256])(n)
     n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    print(n.shape)
 
     n = DeConv2d(128, (3, 3), (1, 1), W_init=w_init, padding='VALID', b_init=None)(n)
     n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    print(n.shape)
 
     n = DeConv2d(128, (3, 3), (1, 1), W_init=w_init, b_init=None)(n)
     n = BatchNorm2d(decay=0.9, act=tf.nn.relu, gamma_init=gamma_init, name=None)(n)
+    print(n.shape)
 
-    n = Conv2d(128, (3, 3), (1, 1), W_init=w_init, padding='VALID')(n)
-
+    n = DeConv2d(128, (3, 3), (1, 1), W_init=w_init, padding='VALID')(n)
+    print(n.shape)
     return tl.models.Model(inputs=nz, outputs=n)
 
 

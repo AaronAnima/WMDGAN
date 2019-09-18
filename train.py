@@ -10,6 +10,8 @@ import argparse
 import math
 import scipy.stats as stats
 import tensorflow_probability as tfp
+import matplotlib.pyplot as plt
+from sklearn import manifold, datasets
 
 import ipdb
 # import sys
@@ -31,6 +33,37 @@ def KStest(real_z, fake_z):
         _, tmp_p = stats.ks_2samp(fake_z[i], real_z[i])
         p_list.append(tmp_p)
     return np.min(p_list), np.mean(p_list)
+
+
+def TSNE(dataset, E, n_step_epoch):
+    total_tensor = None
+    for step, image_labels in enumerate(dataset):
+        batch_imgs = image_labels[0]
+        real_tensor = E(batch_imgs)
+        if step != 0:
+            total_tensor = tf.concat([total_tensor, real_tensor], axis=0)
+        else:
+            total_tensor = real_tensor
+        if np.mod(step, flags.show_freq * 10) == 0 and step != 0:
+            print('Now ' + str(step))
+        if np.mod(step, n_step_epoch) == 0 and step != 0:
+            Tensors = tf.reshape(total_tensor, [-1, 8 * 8 * 128])
+            Tensors = Tensors.numpy()
+            print('tensors already, tsne next')
+            tsne = manifold.TSNE(n_components=2, init='pca', random_state=501)
+            print('transformer already, start fitting ')
+            X_tsne = tsne.fit_transform(Tensors)
+            print('TSNE done, plt next')
+            '''嵌入空间可视化'''
+            x_min, x_max = X_tsne.min(0), X_tsne.max(0)
+            X_norm = (X_tsne - x_min) / (x_max - x_min)  # 归一化
+            plt.figure(figsize=(8, 8))
+            for i in range(X_norm.shape[0]):
+                plt.text(X_norm[i, 0], X_norm[i, 1], str(1), color=plt.cm.Set1(1))
+            plt.xticks([])
+            plt.yticks([])
+            plt.savefig('./test2.jpg')
+            plt.show()
 
 
 def train_GE(con=False):
@@ -137,9 +170,9 @@ def train_Gz():
 
         epoch_num = step // n_step_epoch
         with tf.GradientTape(persistent=True) as tape:
+            real_tensor = E(batch_imgs)
             z = np.random.normal(loc=0.0, scale=1, size=[flags.batch_size_train, flags.z_dim]).astype(np.float32)
             fake_tensor = G_z(z)
-            real_tensor = E(batch_imgs)
 
             fake_tensor_logits = D_z(fake_tensor)
             real_tensor_logits = D_z(real_tensor)
@@ -181,5 +214,5 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='DWGAN', help='train or eval')
     parser.add_argument('--is_continue', type=bool, default=False, help='load weights from checkpoints?')
     args = parser.parse_args()
-    train_GE(con=args.is_continue)
+    # train_GE(con=args.is_continue)
     train_Gz()
